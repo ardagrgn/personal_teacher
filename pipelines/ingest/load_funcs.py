@@ -14,7 +14,7 @@ def _now_iso() -> str:
 
 
 @dataclass
-class IngestedDoc:
+class loadedDoc:
     text: str
     metadata: Dict[str, str] 
 
@@ -26,26 +26,26 @@ def _clean_text(s: str) -> str:
     return s.strip()
 
 
-def ingest_pdf(path: Union[str, Path]) -> IngestedDoc:
+def load_pdf(path: Union[str, Path]) -> loadedDoc:
     import fitz  # PyMuPDF
     p = Path(path)
     doc = fitz.open(p.as_posix())
     pages = [page.get_text("text") for page in doc]
     doc.close()
     text = _clean_text("\n\n".join(pages))
-    return IngestedDoc(
+    return loadedDoc(
         text=text,
         metadata={
             "source": "pdf",
             "path": str(p.resolve()),
             "title": p.stem,
             "hash": _sha256(text),
-            "ingested_at": _now_iso(),
+            "loaded_at": _now_iso(),
         },
     )
 
 
-def ingest_epub(path: Union[str, Path]) -> IngestedDoc:
+def load_epub(path: Union[str, Path]) -> loadedDoc:
     from ebooklib import epub
     from bs4 import BeautifulSoup
 
@@ -80,22 +80,22 @@ def ingest_epub(path: Union[str, Path]) -> IngestedDoc:
             # Append separated text in pieces text
             pieces.append(soup.get_text("\n"))
     text = _clean_text("\n\n".join(pieces))
-    return IngestedDoc(
+    return loadedDoc(
         text=text,
         metadata={
             "source": "epub",
             "path": str(p.resolve()),
             "title": title,
             "hash": _sha256(text),
-            "ingested_at": _now_iso(),
+            "loaded_at": _now_iso(),
         },
     )
 
 
-def ingest_youtube(
+def load_youtube(
     url_or_id: str,
     prefer_langs: Optional[List[str]] = None,
-) -> IngestedDoc:
+) -> loadedDoc:
     """
     Gets official captions if possible (fastest, cheapest).
     If not found and asr_fallback=True, downloads audio and transcribes with Whisper.
@@ -121,7 +121,7 @@ def ingest_youtube(
                 t = transcripts.find_transcript([lang]).fetch()
                 text = _clean_text(" ".join(getattr(seg,"text","") for seg in t.snippets))
                 
-                return IngestedDoc(
+                return loadedDoc(
                     text=text,
                     metadata={
                         "source": "youtube",
@@ -129,7 +129,7 @@ def ingest_youtube(
                         "lang": lang,
                         "mode": "captions",
                         "hash": _sha256(text),
-                        "ingested_at": _now_iso(),
+                        "loaded_at": _now_iso(),
                     },
                 )
             except Exception as e:
@@ -141,7 +141,7 @@ def ingest_youtube(
             try:
                 t = tr.fetch()
                 text = _clean_text(" ".join(getattr(seg,"text","") for seg in t.snippets))
-                return IngestedDoc(
+                return loadedDoc(
                     text=text,
                     metadata={
                         "source": "youtube",
@@ -149,7 +149,7 @@ def ingest_youtube(
                         "lang": getattr(tr, "language_code", "unknown"),
                         "mode": "captions_any",
                         "hash": _sha256(text),
-                        "ingested_at": _now_iso(),
+                        "loaded_at": _now_iso(),
                     },
                 )
             except Exception:
@@ -161,7 +161,7 @@ def ingest_youtube(
 
     except (TranscriptsDisabled, NoTranscriptFound):
         text = ""
-        return IngestedDoc(
+        return loadedDoc(
             text=text,
             metadata={
                 "source": "youtube",
@@ -169,13 +169,13 @@ def ingest_youtube(
                 "lang": "asr",
                 "mode": "whisper",
                 "hash": _sha256(text),
-                "ingested_at": _now_iso(),
+                "loaded_at": _now_iso(),
             },
         )
     
 
 
-def ingest_website(url: str, timeout: int = 20) -> IngestedDoc:
+def load_website(url: str, timeout: int = 20) -> loadedDoc:
     """
     Extracts main article text from a web page.
     Primary: trafilatura. Fallback: readability + BeautifulSoup.
@@ -191,14 +191,14 @@ def ingest_website(url: str, timeout: int = 20) -> IngestedDoc:
         meta = trafilatura.extract_metadata(downloaded)
         #title = (meta.title if meta and getattr(meta, "title", None) else "") or ""
         text = _clean_text(text)
-        return IngestedDoc(
+        return loadedDoc(
             text=text,
             metadata={
                 "source": "website",
                 "url": url,
                 "title": "",
                 "hash": _sha256(text),
-                "ingested_at": _now_iso(),
+                "loaded_at": _now_iso(),
             },
         )
     except Exception:
@@ -212,19 +212,19 @@ def ingest_website(url: str, timeout: int = 20) -> IngestedDoc:
         #title = ""
         soup = BeautifulSoup(html, "lxml")
         text = _clean_text(soup.get_text("\n"))
-        return IngestedDoc(
+        return loadedDoc(
             text=text,
             metadata={
                 "source": "website",
                 "url": url,
                 "title": "",
                 "hash": _sha256(text),
-                "ingested_at": _now_iso(),
+                "loaded_at": _now_iso(),
             },
         )
     
 
-def ingest_txt(path: Union[str, Path], encoding: Optional[str] = None) -> IngestedDoc:
+def load_txt(path: Union[str, Path], encoding: Optional[str] = None) -> loadedDoc:
     p = Path(path)
     content: str
     if encoding:
@@ -241,64 +241,64 @@ def ingest_txt(path: Union[str, Path], encoding: Optional[str] = None) -> Ingest
             print("expection started")
             content = p.read_text(encoding="utf-8", errors="ignore")
     text = _clean_text(content)
-    return IngestedDoc(
+    return loadedDoc(
         text=text,
         metadata={
             "source": "txt",
             "path": str(p.resolve()),
             "title": p.stem,
             "hash": _sha256(text),
-            "ingested_at": _now_iso(),
+            "loaded_at": _now_iso(),
         },
     )
 
 
-def ingest_path(path: Union[str, Path]) -> IngestedDoc:
+def load_path(path: Union[str, Path]) -> loadedDoc:
     """
     Auto-detect by file extension: .pdf, .epub, .txt
     """
     p = Path(path)
     ext = p.suffix.lower()
     if ext == ".pdf":
-        return ingest_pdf(p)
+        return load_pdf(p)
     if ext == ".epub":
-        return ingest_epub(p)
+        return load_epub(p)
     if ext in {".txt", ".md", ".rst", ".log"}:
-        return ingest_txt(p,"utf-8")
+        return load_txt(p,"utf-8")
     raise ValueError(f"Unsupported file extension for {p.name}")
 
 
-def ingest_many(
+def load_many(
     urls: Optional[Iterable[str]] = None,
     files: Optional[Iterable[Union[str, Path]]] = None,
     dedupe_by_hash: bool = True,
-) -> List[IngestedDoc]:
+) -> List[loadedDoc]:
     """
-    Ingest many URLs and/or files; returns a list of IngestedDoc.
+    load many URLs and/or files; returns a list of loadedDoc.
     Dedupe identical text payloads by SHA256 if desired.
     """
     urls = urls or []
     files = files or []
-    docs: List[IngestedDoc] = []
+    docs: List[loadedDoc] = []
 
     # URLs
     for u in urls:
         if u.startswith("http"):
-            docs.append(ingest_website(u))
+            docs.append(load_website(u))
         else:
             # Treat as YouTube ID if length 11 or youtube link
             if ("youtube.com" in u) or ("youtu.be" in u) or (len(u.strip()) == 11):
-                docs.append(ingest_youtube(u))
+                docs.append(load_youtube(u))
             else:
                 raise ValueError(f"Unknown URL/ID format: {u}")
 
     # Files
     for f in files:
-        docs.append(ingest_path(f))
+        docs.append(load_path(f))
 
     if dedupe_by_hash:
         seen = set()
-        unique: List[IngestedDoc] = []
+        unique: List[loadedDoc] = []
         for d in docs:
             h = d.metadata.get("hash", _sha256(d.text))
             if h in seen:
