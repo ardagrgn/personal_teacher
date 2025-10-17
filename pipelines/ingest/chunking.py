@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import re
 from typing import List, Dict, Iterable
 from dataclasses import dataclass
 from tqdm import tqdm
-from __future__ import annotations
+
 
 
 
