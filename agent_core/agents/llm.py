@@ -16,8 +16,8 @@ def call_llm(prompt: str, model: str | None = None, temperature: float = 0.2, ma
         resp = client.chat.completions.create(
             model=use_model,
             messages=[{"role": "user", "content": prompt}],
-            temperature=temperature,
-            max_tokens=max_tokens,
+            #temperature=temperature,
+            #max_tokens=max_tokens,
         )
         return (resp.choices[0].message.content or "").strip()
     except Exception as e:

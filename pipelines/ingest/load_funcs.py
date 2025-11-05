@@ -5,6 +5,17 @@ from typing import Dict, List, Optional, Iterable, Union
 import re, json, hashlib, datetime as dt
 
 
+
+try:
+    import tiktoken
+    _ENC = tiktoken.get_encoding("cl100k_base")
+    def _num_tokens(txt: str) -> int:
+        return len(_ENC.encode(txt))
+except Exception:
+    def _num_tokens(txt: str) -> int:
+        # Rough estimate if tiktoken not installed
+        return max(1, int(len(txt) / 4))
+
 def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8", errors="ignore")).hexdigest()
 
@@ -15,7 +26,7 @@ def _now_iso() -> str:
 
 @dataclass
 class loadedDoc:
-    text: str
+    pages: Dict[int, str]
     metadata: Dict[str, str] 
 
 
@@ -30,20 +41,18 @@ def load_pdf(path: Union[str, Path]) -> loadedDoc:
     import fitz  # PyMuPDF
     p = Path(path)
     doc = fitz.open(p.as_posix())
-    pages = [page.get_text("text") for page in doc]
+    pages = {i: _clean_text(page.get_text("text")) for i, page in enumerate(doc)}
     doc.close()
-    text = _clean_text("\n\n".join(pages))
+    #text = _clean_text("\n\n".join(pages))
     return loadedDoc(
-        text=text,
+        pages=pages,
         metadata={
             "source": "pdf",
             "path": str(p.resolve()),
             "title": p.stem,
-            "hash": _sha256(text),
-            "loaded_at": _now_iso(),
+            "ingested_at": _now_iso(),
         },
     )
-
 
 def load_epub(path: Union[str, Path]) -> loadedDoc:
     from ebooklib import epub
@@ -66,9 +75,9 @@ def load_epub(path: Union[str, Path]) -> loadedDoc:
 
         title = p.stem
 
-    pieces: List[str] = []
-
+    pages = {}
     # Iterate through all items in the epub book
+    i=0
     for item in book.get_items():
         # 9 == DOCUMENT (xhtml)
         #We expcet item to have get_type and get_content methods
@@ -76,25 +85,24 @@ def load_epub(path: Union[str, Path]) -> loadedDoc:
             
             #Gets text content from xhtml document
             soup = BeautifulSoup(item.get_content(), "lxml",)
-            
-            # Append separated text in pieces text
-            pieces.append(soup.get_text("\n"))
-    text = _clean_text("\n\n".join(pieces))
+            pages[i] = soup.get_text()
+            i +=1
+
+
     return loadedDoc(
-        text=text,
+        pages=pages,
         metadata={
             "source": "epub",
             "path": str(p.resolve()),
             "title": title,
-            "hash": _sha256(text),
-            "loaded_at": _now_iso(),
+            "ingested_at": _now_iso(),
         },
     )
-
 
 def load_youtube(
     url_or_id: str,
     prefer_langs: Optional[List[str]] = None,
+    token_limit: int = 1024
 ) -> loadedDoc:
     """
     Gets official captions if possible (fastest, cheapest).
@@ -120,16 +128,26 @@ def load_youtube(
             try:
                 t = transcripts.find_transcript([lang]).fetch()
                 text = _clean_text(" ".join(getattr(seg,"text","") for seg in t.snippets))
-                
+                text_token = _num_tokens(text)
+
+                ratio= text_token / token_limit
+                pages={}
+                if ratio > 1:
+                    for i in range(int(ratio)+1):
+                        start_idx= int(i* token_limit)
+                        end_idx= int((i+1)* token_limit)
+                        pages[i]= text[start_idx:end_idx]
+                else:
+                    pages[0]=text
+
                 return loadedDoc(
-                    text=text,
+                    pages=pages,
                     metadata={
                         "source": "youtube",
                         "url": url,
                         "lang": lang,
                         "mode": "captions",
-                        "hash": _sha256(text),
-                        "loaded_at": _now_iso(),
+                        "ingested_at": _now_iso(),
                     },
                 )
             except Exception as e:
@@ -141,15 +159,27 @@ def load_youtube(
             try:
                 t = tr.fetch()
                 text = _clean_text(" ".join(getattr(seg,"text","") for seg in t.snippets))
+
+                text_token = _num_tokens(text)
+
+                ratio= text_token / token_limit
+                pages={}
+                if ratio > 1:
+                    for i in range(int(ratio)+1):
+                        start_idx= int(i* token_limit)
+                        end_idx= int((i+1)* token_limit)
+                        pages[i]= text[start_idx:end_idx]
+                else:
+                    pages[0]=text
+
                 return loadedDoc(
-                    text=text,
+                    pages=pages,
                     metadata={
                         "source": "youtube",
                         "url": url,
                         "lang": getattr(tr, "language_code", "unknown"),
                         "mode": "captions_any",
-                        "hash": _sha256(text),
-                        "loaded_at": _now_iso(),
+                        "ingested_at": _now_iso(),
                     },
                 )
             except Exception:
@@ -160,22 +190,23 @@ def load_youtube(
         return transcripts
 
     except (TranscriptsDisabled, NoTranscriptFound):
-        text = ""
+        pages = {0:""}
         return loadedDoc(
-            text=text,
+            pages=pages,
             metadata={
                 "source": "youtube",
                 "url": url,
                 "lang": "asr",
                 "mode": "whisper",
-                "hash": _sha256(text),
-                "loaded_at": _now_iso(),
+                "ingested_at": _now_iso(),
             },
         )
-    
 
 
-def load_website(url: str, timeout: int = 20) -> loadedDoc:
+
+def load_website(url: str, 
+                 timeout: int = 20, 
+                 token_limit: int = 1024) -> loadedDoc:
     """
     Extracts main article text from a web page.
     Primary: trafilatura. Fallback: readability + BeautifulSoup.
@@ -188,17 +219,29 @@ def load_website(url: str, timeout: int = 20) -> loadedDoc:
         text = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
         if not text:
             raise RuntimeError("trafilatura.extract returned None")
-        meta = trafilatura.extract_metadata(downloaded)
+        #meta = trafilatura.extract_metadata(downloaded)
         #title = (meta.title if meta and getattr(meta, "title", None) else "") or ""
         text = _clean_text(text)
+
+        text_token = _num_tokens(text)
+
+        ratio= text_token / token_limit
+        pages={}
+        if ratio > 1:
+            for i in range(int(ratio)+1):
+                start_idx= int(i* token_limit)
+                end_idx= int((i+1)* token_limit)
+                pages[i]= text[start_idx:end_idx]
+        else:
+            pages[0]=text
+
         return loadedDoc(
-            text=text,
+            pages=pages,
             metadata={
                 "source": "website",
                 "url": url,
                 "title": "",
-                "hash": _sha256(text),
-                "loaded_at": _now_iso(),
+                "ingested_at": _now_iso(),
             },
         )
     except Exception:
@@ -212,19 +255,31 @@ def load_website(url: str, timeout: int = 20) -> loadedDoc:
         #title = ""
         soup = BeautifulSoup(html, "lxml")
         text = _clean_text(soup.get_text("\n"))
+        text_token = _num_tokens(text)
+
+        ratio= text_token / token_limit
+        pages={}
+        if ratio > 1:
+            for i in range(int(ratio)+1):
+                start_idx= int(i* token_limit)
+                end_idx= int((i+1)* token_limit)
+                pages[i]= text[start_idx:end_idx]
+        else:
+            pages[0]=text
+
         return loadedDoc(
-            text=text,
+            pages=pages,
             metadata={
                 "source": "website",
                 "url": url,
                 "title": "",
-                "hash": _sha256(text),
-                "loaded_at": _now_iso(),
+                "ingested_at": _now_iso(),
             },
         )
-    
 
-def load_txt(path: Union[str, Path], encoding: Optional[str] = None) -> loadedDoc:
+def load_txt(path: Union[str, Path], 
+             encoding: Optional[str] = None,
+             token_limit: int = 1024) -> loadedDoc:
     p = Path(path)
     content: str
     if encoding:
@@ -241,30 +296,56 @@ def load_txt(path: Union[str, Path], encoding: Optional[str] = None) -> loadedDo
             print("expection started")
             content = p.read_text(encoding="utf-8", errors="ignore")
     text = _clean_text(content)
+
+    text_token = _num_tokens(text)
+
+    ratio= text_token / token_limit
+    pages={}
+    if ratio > 1:
+        for i in range(int(ratio)+1):
+            start_idx= int(i* token_limit)
+            end_idx= int((i+1)* token_limit)
+            pages[i]= text[start_idx:end_idx]
+    else:
+        pages[0]=text
+
+
     return loadedDoc(
-        text=text,
+        pages=pages,
         metadata={
             "source": "txt",
             "path": str(p.resolve()),
             "title": p.stem,
-            "hash": _sha256(text),
-            "loaded_at": _now_iso(),
+            "ingested_at": _now_iso(),
         },
     )
 
 
-def load_path(path: Union[str, Path]) -> loadedDoc:
+def general_load(path: Union[str, Path], 
+                 token_limit: int = 1024) -> loadedDoc:
     """
     Auto-detect by file extension: .pdf, .epub, .txt
     """
+    p=path
+
+    if ("youtube.com" in p) or ("youtu.be" in p) or (len(p.strip()) == 11):
+        return load_youtube( p, token_limit=token_limit)
+
+    if p.startswith("http") or p.startswith("www"):
+        return load_website(p, token_limit=token_limit)
+
     p = Path(path)
     ext = p.suffix.lower()
+    
     if ext == ".pdf":
-        return load_pdf(p)
+        return load_pdf(p, )
+    
     if ext == ".epub":
-        return load_epub(p)
+        return load_epub(p, )
+    
     if ext in {".txt", ".md", ".rst", ".log"}:
-        return load_txt(p,"utf-8")
+        return load_txt(p,"utf-8", token_limit=token_limit)
+
     raise ValueError(f"Unsupported file extension for {p.name}")
 
 
@@ -294,7 +375,7 @@ def load_many(
 
     # Files
     for f in files:
-        docs.append(load_path(f))
+        docs.append(general_load(f))
 
     if dedupe_by_hash:
         seen = set()

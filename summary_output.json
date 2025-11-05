@@ -1,0 +1,154 @@
+{
+  "Document_Type": "Research Article",
+  "Title": "Vox2Vox: 3D-GAN for Brain Tumour Segmentation",
+  "Authors": [
+    "Marco Domenico Cirillo",
+    "David Abramian",
+    "Anders Eklund"
+  ],
+  "Affiliations": [
+    "Department of Biomedical Engineering",
+    "Center for Medical Image Science and Visualization",
+    "Division of Statistics and Machine Learning, Department of Computer and Information Science",
+    "Linköping University, Linköping, Sweden"
+  ],
+  "Contents": [
+    {"Title": "Abstract", "Page": 1},
+    {"Title": "Keywords", "Page": 1},
+    {"Title": "1 Introduction", "Page": 1},
+    {"Title": "1.1 Related Works", "Page": 2},
+    {"Title": "2 Method", "Page": 2},
+    {"Title": "2.1 Data", "Page": 2},
+    {"Title": "2.2 Image Pre-processing", "Page": 3},
+    {"Title": "2.3 Model Architecture", "Page": 4},
+    {"Title": "2.4 Losses", "Page": 5},
+    {"Title": "2.5 Optimization and Regularization", "Page": 5},
+    {"Title": "2.6 Model Ensembling", "Page": 5},
+    {"Title": "3 Results", "Page": 6},
+    {"Title": "4 Conclusion", "Page": 7},
+    {"Title": "Acknowledgement", "Page": 8},
+    {"Title": "References", "Page": 9}
+  ],
+  "Sections": [
+    {
+      "metadata": {
+        "Tittle": "Abstract",
+        "Start_Page": 1,
+        "End_Page": 1
+      },
+      "Summary": "# Abstract\n\n## Main Idea\nIntroduce Vox2Vox, a 3D volume-to-volume GAN for segmenting brain tumours from multi-channel 3D MRI.\n\n## Key Points\n- Generator: 3D U-Net; Discriminator: 3D GAN.\n- Best performance when the generator loss is weighted 5× higher than the discriminator loss.\n- Performance (BraTS 2018 training set, ensemble of 5 models):\n  - Dice: WT 90.66%, TC 82.54%, ET 78.71%\n  - Hausdorff95: WT 4.04 mm, TC 6.07 mm, ET 5.00 mm\n- Compares favorably to BraTS 2018 winners (not directly comparable).\n\n## Explanation\nThe GAN framework enforces realism in segmentations via the discriminator, while the U-Net generator produces voxel-wise predictions. Weighting the generator loss more heavily (α = 5) yields the best trade-off between segmentation accuracy and adversarial realism, producing competitive dice scores and reasonable boundary accuracy (Hausdorff95)."
+    },
+    {
+      "metadata": {
+        "Tittle": "Keywords",
+        "Start_Page": 1,
+        "End_Page": 1
+      },
+      "Summary": "# Keywords\n\n## Main Idea\nList of core technical terms describing the study’s scope.\n\n## Key Points\n- MRI\n- Vox2Vox\n- Generative Adversarial Networks\n- deep learning\n- artificial intelligence\n- 3D image segmentation\n\n## Explanation\nThe keywords reflect the method (GANs, deep learning), the application (3D MRI brain tumour segmentation), and the specific model (Vox2Vox)."
+    },
+    {
+      "metadata": {
+        "Tittle": "1 Introduction",
+        "Start_Page": 1,
+        "End_Page": 1
+      },
+      "Summary": "# 1 Introduction\n\n## Main Idea\nMotivate automated segmentation of gliomas due to their diffuse growth and edema that complicate clinical delineation.\n\n## Key Points\n- Gliomas include HGG and LGG, often with diffuse, infiltrative growth and peritumoural edema.\n- Visual assessment is challenging; borders are hard to define.\n- Machine learning and deep learning achieve state-of-the-art segmentation and can aid surgery.\n\n## Explanation\nBecause gliomas infiltrate surrounding tissue and increase water content (edema), manual boundary definition is arduous in both analysis and surgery. Recent ML/DL methods provide accurate segmentation, offering practical support for clinical workflows."
+    },
+    {
+      "metadata": {
+        "Tittle": "1.1 Related Works",
+        "Start_Page": 2,
+        "End_Page": 2
+      },
+      "Summary": "# 1.1 Related Works\n\n## Main Idea\nSituate Vox2Vox within GAN-based imaging and segmentation literature, especially image-to-image translation (Pix2Pix).\n\n## Key Points\n- GAN applications: style transfer, image synthesis from noise, image-to-image translation, segmentation.\n- Medical imaging relevance: smaller datasets; multi-modality; CycleGAN can synthesize missing modalities.\n- Prior GAN-based segmentation examples across MRI spine, HEp-2 cells, organs-at-risk, and brain tumours (2D).\n- Motivation: Pix2Pix-inspired 3D image-to-image GAN for segmentation; GAN can penalize unrealistic segmentations.\n\n## Explanation\nGANs are well suited to medical imaging’s data constraints and multi-modality. Prior work shows diverse uses of GANs for segmentation. Building on Pix2Pix, Vox2Vox aims to perform 3D segmentation where the discriminator encourages anatomically realistic outputs, potentially improving over pure voxel-wise optimization."
+    },
+    {
+      "metadata": {
+        "Tittle": "2 Method",
+        "Start_Page": 2,
+        "End_Page": 5
+      },
+      "Summary": "# 2 Method\n\n## Main Idea\nDescribe data, preprocessing, architecture, loss design, training strategy, and ensembling for Vox2Vox.\n\n## Key Points\n- Dataset: BraTS 2018 multi-modal MR volumes with expert annotations.\n- Preprocessing: per-channel normalization, categorical labels, patch-based training.\n- Architecture: U-Net generator; PatchGAN-like discriminator; instance normalization.\n- Losses: adversarial L2 terms and generalized dice loss with weighting α.\n- Training: Adam optimizer, dropout in bottleneck.\n- Ensembling: average softmax probabilities across cross-validated models.\n\n## Explanation\nThe pipeline tailors GAN-based segmentation to 3D multi-modal MRI. Patch extraction makes training tractable. The generator produces multi-class segmentations; the discriminator enforces realism. The combined loss balances overlap accuracy (generalized dice) with adversarial consistency, tuned via α. Ensembling stabilizes performance by averaging voxel-wise class probabilities."
+    },
+    {
+      "metadata": {
+        "Tittle": "2.1 Data",
+        "Start_Page": 2,
+        "End_Page": 2
+      },
+      "Summary": "# 2.1 Data\n\n## Main Idea\nUse BraTS 2018 training dataset with four MRI modalities and expert segmentations.\n\n## Key Points\n- Volume shape: 240 × 240 × 155; 285 patients; modalities: T1, T1Gd, T2, FLAIR.\n- Data from 19 institutions with varied protocols.\n- Annotations: manual by 1–4 raters, protocol-consistent, neuro-radiologist approved.\n\n## Explanation\nThe dataset’s multi-institutional, multi-modal nature and expert-reviewed labels provide a robust basis for training and evaluating brain tumour segmentation."
+    },
+    {
+      "metadata": {
+        "Tittle": "2.2 Image Pre-processing",
+        "Start_Page": 3,
+        "End_Page": 3
+      },
+      "Summary": "# 2.2 Image Pre-processing\n\n## Main Idea\nNormalize inputs, encode labels, and use patch-based augmentation to manage memory.\n\n## Key Points\n- Per-channel intensity normalization; background set to 0.\n- Labels converted to 4-channel categorical: 0 background, 1 ED, 2 NCR/NET, 3 ET.\n- Patch extraction: one 128 × 128 × 128 sub-volume per original volume per epoch.\n- Dataset split: 182 train (64%), 46 val (16%), 57 test (20%).\n\n## Explanation\nNormalization standardizes inputs; categorical encoding matches multi-class output. Patch sampling reduces memory demands, using about 23.5% of total data per epoch while maintaining coverage across subjects through epochs."
+    },
+    {
+      "metadata": {
+        "Tittle": "2.3 Model Architecture",
+        "Start_Page": 4,
+        "End_Page": 4
+      },
+      "Summary": "# 2.3 Model Architecture\n\n## Main Idea\nAdopt a 3D U-Net generator and a 3D discriminator to form the Vox2Vox GAN.\n\n## Key Points\n- Generator (U-Net style):\n  - Input: 4-channel 3D image (T1, T1Gd, T2, FLAIR).\n  - Encoder: four 3D conv layers (4×4×4, stride 2), instance norm, Leaky ReLU; filters double each downsampling starting at 64.\n  - Bottleneck: four 3D conv layers (stride 1) with instance norm and Leaky ReLU; concatenated outputs.\n  - Decoder: three 3D transpose conv layers (stride 2) with instance norm and ReLU; skip connections from encoder.\n  - Output: transpose conv to 4 channels with softmax, producing 128×128×128×4 segmentation.\n- Discriminator:\n  - Input: image plus ground-truth or generator prediction.\n  - Encoder as in generator; output: 8×8×8×1 via 3D conv to score realism.\n- Initialization: He et al.; Leaky ReLU slope 0.3.\n\n## Explanation\nThe U-Net captures multi-scale context and preserves spatial detail via skip connections. The discriminator operates on local volumes to assess segmentation realism, guiding the generator towards anatomically plausible outputs."
+    },
+    {
+      "metadata": {
+        "Tittle": "2.4 Losses",
+        "Start_Page": 5,
+        "End_Page": 5
+      },
+      "Summary": "# 2.4 Losses\n\n## Main Idea\nCombine adversarial and segmentation losses with a tunable weight α.\n\n## Key Points\n- Discriminator loss: L2[D(x, y), 1] + L2[D(x, ŷ), 0].\n- Generator loss: L2[D(x, ŷ), 1] + α·GDL(y, ŷ).\n- Behavior extremes:\n  - α = 0 → pure GAN (unsupervised, ignores dice).\n  - α → ∞ → behaves like 3D U-Net (ignores discriminator).\n\n## Explanation\nThe adversarial terms push predictions to be judged as real by the discriminator, while the generalized dice loss directly optimizes segmentation overlap, addressing class imbalance. α controls the trade-off between realism and overlap accuracy."
+    },
+    {
+      "metadata": {
+        "Tittle": "2.5 Optimization and Regularization",
+        "Start_Page": 5,
+        "End_Page": 5
+      },
+      "Summary": "# 2.5 Optimization and Regularization\n\n## Main Idea\nTrain both networks with Adam and regularize the generator’s bottleneck; leverage the discriminator as a shape regularizer.\n\n## Key Points\n- Optimizer: Adam with λ = 2×10⁻⁴, β1 = 0.5, β2 = 0.999.\n- Dropout: 0.2 after each bottleneck conv in the generator.\n- Discriminator aids spatial consistency, acting as a shape regularizer.\n- Expect best performance with α that balances both losses.\n\n## Explanation\nThe chosen optimizer settings match GAN training conventions. Dropout and adversarial feedback help prevent overfitting and enforce plausible shapes, suggesting intermediate α values should be effective."
+    },
+    {
+      "metadata": {
+        "Tittle": "2.6 Model Ensembling",
+        "Start_Page": 5,
+        "End_Page": 5
+      },
+      "Summary": "# 2.6 Model Ensembling\n\n## Main Idea\nUse M-fold cross-validation and ensemble model probabilities to improve robustness.\n\n## Key Points\n- Ensemble prediction: average voxel-wise class probabilities from M models: ŷ_E = (1/M) Σ P(y|x, m_i).\n- Purpose: produce more robust segmentation than individual models.\n\n## Explanation\nAveraging softmax probabilities stabilizes predictions across model variations, typically improving dice and boundary metrics relative to single models."
+    },
+    {
+      "metadata": {
+        "Tittle": "3 Results",
+        "Start_Page": 6,
+        "End_Page": 7
+      },
+      "Summary": "# 3 Results\n\n## Main Idea\nReport implementation details, training setup, augmentation effects, cross-validation, ensembling performance, and comparison with BraTS 2018 winners.\n\n## Key Points\n- Implementation and training:\n  - Python 3.7, TensorFlow 2.1 (Keras); RTX 2080 Ti (11 GB), 128 GB RAM.\n  - Train on 128³ patches from 182 subjects; batch size 4; 200 epochs; 46 val; 57 test.\n  - Test volumes cropped to 160×192×128 to fit network depth.\n  - Best α = 5.\n- Augmentation impact (Table 1):\n  - Techniques: patch extraction (PE), flipping (F), rotation (R; 0–30°), and combinations.\n  - Best with PE+F+R: Dice WT 89.73%, TC 81.02%, ET 77.46; Hausdorff95 WT 4.60 mm, TC 6.97 mm, ET 5.00 mm.\n  - Training time: 8–9 min/epoch (disk), 4–5 min/epoch (RAM).\n- Cross-validation and ensembling (Table 2):\n  - 5-fold CV; ensemble of 5 models improves over all single models.\n  - Ensemble: Dice WT 90.66%, TC 82.54%, ET 78.71; Hausdorff95 WT 4.04 mm, TC 6.07 mm, ET 5.00 mm.\n  - A weaker individual model did not degrade ensemble results.\n- Comparison with BraTS 2018 winners:\n  - Vox2Vox ensemble shows ~1–2% higher dice across classes but worse Hausdorff95 for TC and ET.\n  - Exact comparison not possible due to different data splits and ensemble sizes.\n  - Possible reason for Hausdorff differences: discriminator-induced shape regularization.\n\n## Explanation\nCareful preprocessing and augmentation notably boost performance. Cross-validation plus probability averaging yields the best segmentation quality. While not directly comparable, the results indicate competitive dice with slightly compromised boundary accuracy for certain subregions, plausibly linked to the discriminator’s emphasis on shape realism."
+    },
+    {
+      "metadata": {
+        "Tittle": "4 Conclusion",
+        "Start_Page": 7,
+        "End_Page": 8
+      },
+      "Summary": "# 4 Conclusion\n\n## Main Idea\nVox2Vox ensembles produce high-quality brain tumour segmentations, competitive with BraTS 2018 winners; future work includes data synthesis for augmentation and larger-scale evaluation.\n\n## Key Points\n- Ensemble performance: Dice WT 90.66%, TC 82.54%, ET 78.71; Hausdorff95 WT 4.04 mm, TC 6.07 mm, ET 5.00 mm.\n- Comparability caveat: training/testing sizes and ensemble counts differ from BraTS winners.\n- Future direction: combine Vox2Vox with a 3D noise-to-image GAN to synthesize paired MR images and segmentations for augmentation; evaluate on larger datasets (e.g., future BraTS).\n\n## Explanation\nThe approach leverages adversarial learning and ensembling to achieve strong segmentation metrics. Synthetic data generation may further improve training efficiency and performance, and broader evaluation would clarify generalizability."
+    },
+    {
+      "metadata": {
+        "Tittle": "Acknowledgement",
+        "Start_Page": 8,
+        "End_Page": 8
+      },
+      "Summary": "# Acknowledgement\n\n## Main Idea\nList funding and institutional support.\n\n## Key Points\n- VINNOVA Analytic Imaging Diagnostics Arena (AIDA).\n- ITEA3/VINNOVA project IMPACT.\n- Center for Industrial Information Technology (CENIIT), Linköping University.\n\n## Explanation\nThe project received national and institutional support focused on medical imaging diagnostics and industrial information technology."
+    },
+    {
+      "metadata": {
+        "Tittle": "References",
+        "Start_Page": 9,
+        "End_Page": 10
+      },
+      "Summary": "# References\n\n## Main Idea\nCitations supporting datasets, methods, and related GAN applications (33 references).\n\n## Key Points\n- BraTS datasets and benchmarks; expert labeling protocols.\n- Foundational works: GANs, Pix2Pix, CycleGAN, U-Net, generalized dice loss, Adam, initialization.\n- Medical imaging GAN applications: segmentation across multiple organs/modalities; MRI synthesis.\n\n## Explanation\nThe references ground the work in established datasets and methods and highlight the breadth of GAN use in medical image analysis, underpinning Vox2Vox’s design choices and evaluation."
+    }
+  ]
+}
